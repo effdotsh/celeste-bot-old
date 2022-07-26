@@ -1,3 +1,4 @@
+import math
 import random
 
 import numpy as np
@@ -9,7 +10,7 @@ import time
 from population_manager import Population
 from tqdm import tqdm
 POPULATION_SIZE = 20
-RUN_TIME = 15
+RUN_TIME = 3.3
 
 
 def calibrate_screen(sct):
@@ -83,7 +84,7 @@ def reset_level(keyboard: Controller):
     keyboard.press('s')
     time.sleep(0.2)
     keyboard.release('s')
-    time.sleep(0.4)
+    time.sleep(0.75)
 
 mon = {'left': 200, 'top': 225, 'width': 800, 'height': 800}
 x_pos, y_pos = 0, 0
@@ -95,9 +96,8 @@ generation_counter = 0
 last_press = time.time()
 start = time.time()
 actions = generate_actions()
-pop = Population(population_size=POPULATION_SIZE, agent_num_choices=len(actions), agent_num_actions=11*RUN_TIME)
+pop = Population(population_size=POPULATION_SIZE, agent_num_choices=len(actions), agent_num_actions=int(11*RUN_TIME+0.5))
 pop.agents[0].mutation_chance=1
-
 
 
 if __name__ == '__main__':
@@ -115,13 +115,10 @@ if __name__ == '__main__':
                 y_pos = 0
                 reset_level(keyboard)
                 start = time.time()
-                agent_best = -999999
                 for a in agent.get_actions():
                     action = actions[a]
                     x_pos, y_pos, _, _ = get_position(sct)
-                    score = -y_pos
-                    if score > agent_best:
-                        agent_best = score
+
 
                     if time.time() - last_press > 0.01:
                         for key in action:
@@ -136,9 +133,10 @@ if __name__ == '__main__':
                     if time.time() - start > RUN_TIME:
                         break
 
-                agent.set_fitness(agent_best)
-                if agent_best > best_score:
-                    print(f"Improved from {best_score} to {agent_best}")
-                    best_score = agent_best
+                score = -math.dist((x_pos, y_pos), (710, 390))
+                agent.set_fitness(score)
+                if score > best_score:
+                    print(f"Improved from {best_score} to {score}")
+                    best_score = score
             print("Best Score:", best_score)
             pop.evolve()
