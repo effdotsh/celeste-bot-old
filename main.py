@@ -11,6 +11,24 @@ from tqdm import tqdm
 POPULATION_SIZE = 20
 RUN_TIME = 15
 
+
+def calibrate_screen(sct):
+    while True:
+        screenShot = sct.grab(mon)
+        img = Image.frombytes(
+            'RGBA',
+            (screenShot.width, screenShot.height),
+            screenShot.bgra,
+        )
+        img = np.array(img)
+        cv2.imshow('calibrate', img)
+        key = cv2.waitKey(1)
+        if key == 27 or key == 113:
+            cv2.destroyAllWindows()
+            return
+            break
+
+
 def get_position(sct):
     screenShot = sct.grab(mon)
     img = Image.frombytes(
@@ -67,7 +85,7 @@ def reset_level(keyboard: Controller):
     keyboard.release('s')
     time.sleep(0.4)
 
-mon = {'left': 100, 'top': 0, 'width': 900, 'height': 1000}
+mon = {'left': 200, 'top': 225, 'width': 800, 'height': 800}
 x_pos, y_pos = 0, 0
 
 keyboard = Controller()
@@ -79,9 +97,14 @@ start = time.time()
 actions = generate_actions()
 pop = Population(population_size=POPULATION_SIZE, agent_num_choices=len(actions), agent_num_actions=11*RUN_TIME)
 pop.agents[0].mutation_chance=1
+
+
+
 if __name__ == '__main__':
     time.sleep(1)
     with mss() as sct:
+        calibrate_screen(sct)
+
         while True:
             print('------')
             print('Generation:', generation_counter)
@@ -104,7 +127,7 @@ if __name__ == '__main__':
                         for key in action:
                             if key is not None:
                                 keyboard.press(key)
-                        time.sleep(0.1)
+                        time.sleep(0.25)
                         for key in action:
                             if key is not None:
                                 keyboard.release(key)
