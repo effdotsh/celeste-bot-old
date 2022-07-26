@@ -6,11 +6,10 @@ from mss import mss
 from PIL import Image
 from pynput.keyboard import Key, Controller
 import time
-
-mon = {'left': 100, 'top': 0, 'width': 900, 'height': 1000}
-
-x_pos, y_pos = 0, 0
-
+from population_manager import Population
+from tqdm import tqdm
+POPULATION_SIZE = 20
+RUN_TIME = 15
 
 def get_position(sct):
     screenShot = sct.grab(mon)
@@ -68,34 +67,55 @@ def reset_level(keyboard: Controller):
     keyboard.release('s')
     time.sleep(0.4)
 
+mon = {'left': 100, 'top': 0, 'width': 900, 'height': 1000}
+x_pos, y_pos = 0, 0
 
 keyboard = Controller()
 
 best_score = -999999
+generation_counter = 0
 last_press = time.time()
 start = time.time()
 actions = generate_actions()
-
+pop = Population(population_size=POPULATION_SIZE, agent_num_choices=len(actions), agent_num_actions=11*RUN_TIME)
+pop.agents[0].mutation_chance=1
 if __name__ == '__main__':
+    time.sleep(1)
     with mss() as sct:
         while True:
-            x_pos, y_pos, _, _ = get_position(sct)
-            score = -y_pos
-            if score > best_score:
-                best_score = score
-            print(best_score)
-            action = random.choice(actions)
+            print('------')
+            print('Generation:', generation_counter)
+            generation_counter += 1
 
-            if time.time() - last_press > 0.01:
-                for key in action:
-                    if key is not None:
-                        keyboard.press(key)
-                time.sleep(0.1)
-                for key in action:
-                    if key is not None:
-                        keyboard.release(key)
-                last_press = time.time()
-
-            if time.time() - start > 5:
+            for agent in tqdm(pop.get_agents()):
+                x_pos = 0
+                y_pos = 0
                 reset_level(keyboard)
                 start = time.time()
+                agent_best = -999999
+                for a in agent.get_actions():
+                    action = actions[a]
+                    x_pos, y_pos, _, _ = get_position(sct)
+                    score = -y_pos
+                    if score > agent_best:
+                        agent_best = score
+
+                    if time.time() - last_press > 0.01:
+                        for key in action:
+                            if key is not None:
+                                keyboard.press(key)
+                        time.sleep(0.1)
+                        for key in action:
+                            if key is not None:
+                                keyboard.release(key)
+                        last_press = time.time()
+
+                    if time.time() - start > RUN_TIME:
+                        break
+
+                agent.set_fitness(agent_best)
+                if agent_best > best_score:
+                    print(f"Improved from {best_score} to {agent_best}")
+                    best_score = agent_best
+            print("Best Score:", best_score)
+            pop.evolve()
