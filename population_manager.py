@@ -12,7 +12,7 @@ MAX_MUTATION_CHANCE = 0.3
 
 
 class Population:
-    def __init__(self, population_size, agent_num_actions: int, agent_num_choices: int, write_results: bool = True):
+    def __init__(self, population_size, write_results: bool = True):
         self.write_results = write_results
         self.agents = []
         self.generation_counter = 0

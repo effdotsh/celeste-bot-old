@@ -1,17 +1,17 @@
 {
   "levels": [
     {
-      "points": [
+      "targets": [
         {
           "x": 715,
           "y": 400,
-          "thresh": 10,
+          "thresh": 15,
           "time":3.5
         },
         {
           "x": 715,
           "y": 0,
-          "thresh": 10,
+          "thresh": 15,
           "time": 3.5
         }
       ]
