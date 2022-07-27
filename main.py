@@ -15,6 +15,8 @@ POPULATION_SIZE = 20
 START_LEVEL = 0
 
 dead_dist = 200
+
+
 def calibrate_screen(sct):
     while True:
         screenShot = sct.grab(mon)
@@ -67,7 +69,7 @@ def get_position(sct, target_x, target_y):
 
     dead = False
     for e, a in enumerate(points):
-        for b in points[e+1:]:
+        for b in points[e + 1:]:
             dist = math.dist(a, b)
             if dist > dead_dist:
                 dead = True
@@ -82,7 +84,7 @@ def get_position(sct, target_x, target_y):
         cv2.destroyAllWindows()
         quit()
 
-    return x, y, h, w, dead
+    return x + w / 2, y + h / 2, dead
 
 
 def generate_actions():
@@ -163,12 +165,11 @@ if __name__ == '__main__':
                                 keyboard.press(key)
                         last_press = time.time()
                         while time.time() - last_press < 0.25:
-                            x_pos, y_pos, _, _, dead = get_position(sct, target['x'], target['y'])
+                            x_pos, y_pos, dead = get_position(sct, target['x'], target['y'])
                             if dead:
                                 break
 
                         if dead:
-                            score -= 100
                             break
 
                         for key in reversed(action):
@@ -179,6 +180,12 @@ if __name__ == '__main__':
                         if time.time() - start > level_time:
                             break
 
+                    start_pause = time.time()
+                    while time.time() - start_pause < target['pause'] and not dead:
+                        x_pos, y_pos, dead = get_position(sct, target['x'], target['y'])
+                    if dead:
+                        score -= abs(target['thresh'])
+
                     score += -math.dist((x_pos, y_pos), (target['x'], target['y']))
                     agent.set_fitness(score)
                     if score > best_score:
@@ -187,7 +194,7 @@ if __name__ == '__main__':
 
                 print("Best Score:", best_score)
                 pop.evolve()
-                if abs(best_score) < target['thresh']:
+                if best_score > target['thresh']:
                     print("REACHED CHECKPOINT")
                     best_score = -999999
                     pop.propogate()
@@ -221,4 +228,3 @@ if __name__ == '__main__':
 
             score = -math.dist((x_pos, y_pos), (target['x'], target['y']))
             agent.set_fitness(score)
-
