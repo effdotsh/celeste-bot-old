@@ -10,3 +10,5 @@ models
 
 *.log
 *.png
+
+!targets.json
