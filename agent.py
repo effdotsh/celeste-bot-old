@@ -6,7 +6,7 @@ import numpy as np
 
 class Agent:
     def __init__(self, mutation_chance: float):
-        self.targets = []
+        self.targets: list[Target] = []
 
         self.fitness = 0
         self.run_data = {}
@@ -23,6 +23,7 @@ class Agent:
         actions = []
         for target in self.targets:
             actions += target.get_actions()
+            actions.append(-1)
         return actions
 
     def set_fitness(self, f):
@@ -38,3 +39,7 @@ class Agent:
 
     def get_fitness(self):
         return self.fitness
+
+    def cut_to(self, action_counter):
+        self.targets[-1].num_actions = action_counter
+        pass

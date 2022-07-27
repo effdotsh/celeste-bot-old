@@ -7,8 +7,8 @@ import numpy as np
 
 CARRY_OVER = 1
 
-MIN_MUTATION_CHANCE = 0.05
-MAX_MUTATION_CHANCE = 0.3
+MIN_MUTATION_CHANCE = 1
+MAX_MUTATION_CHANCE = 1
 
 
 class Population:
@@ -33,7 +33,7 @@ class Population:
         with open("results.json", 'w+') as f:
             f.write(json.dumps({"results": self.results}, indent=4))
 
-    def get_agents(self):
+    def get_agents(self) -> list[Agent]:
         return self.agents
 
     def sort(self):
@@ -63,6 +63,7 @@ class Population:
         self.generation_counter += 1
 
     def propogate(self):
+        self.sort()
         for agent in self.agents[1:]:
             for e, target in enumerate(agent.targets):
                 target.actions = copy.deepcopy(self.agents[0].targets[e].actions)

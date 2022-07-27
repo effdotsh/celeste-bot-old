@@ -8,6 +8,8 @@ from mss import mss
 from PIL import Image
 from pynput.keyboard import Key, Controller
 import time
+
+from agent import Agent
 from population_manager import Population
 from tqdm import tqdm
 
@@ -34,7 +36,8 @@ def calibrate_screen(sct):
             break
 
 
-def get_position(sct, target_x, target_y):
+def get_position(sct, target_x, target_y, target_radius, show_screen: bool = False):
+    target_radius = abs(target_radius)
     screenShot = sct.grab(mon)
     img = Image.frombytes(
         'RGBA',
@@ -73,18 +76,19 @@ def get_position(sct, target_x, target_y):
             dist = math.dist(a, b)
             if dist > dead_dist:
                 dead = True
-                print(time.time(), 'HEAVY IS DED')
-    cv2.rectangle(img, (x, y), (x + w, y + h), (255, 100, 255), 6)
 
-    cv2.circle(img, (target_x, target_y), 2, (100, 255, 100), 5)
+    if show_screen:
+        cv2.rectangle(img, (x, y), (x + w, y + h), (255, 100, 255), 6)
 
-    cv2.imshow('img', img)
-    key = cv2.waitKey(1)
-    if key == 27 or key == 113:
-        cv2.destroyAllWindows()
-        quit()
+        cv2.circle(img, (target_x, target_y), target_radius, (100, 255, 100, 10), 5)
+        cv2.circle(img, (target_x, target_y), 2, (100, 255, 100), -1)
 
-    return x + w / 2, y + h / 2, dead
+        cv2.imshow('img', img)
+        key = cv2.waitKey(1)
+        if key == 27 or key == 113:
+            cv2.destroyAllWindows()
+            quit()
+    return int(x + w / 2), int(y + h / 2), dead
 
 
 def generate_actions():
@@ -127,7 +131,10 @@ generation_counter = 0
 level_counter = START_LEVEL
 last_press = time.time()
 start = time.time()
+
 actions = generate_actions()
+buttons = ['x', 'z', Key.left, Key.right, Key.up, Key.down]
+
 pop = Population(population_size=POPULATION_SIZE)
 pop.agents[0].mutation_chance = 1
 
@@ -138,7 +145,7 @@ if __name__ == '__main__':
     with mss() as sct:
         targets = levels['levels'][level_counter]['targets']
         calibrate_screen(sct)
-        get_position(sct, targets[0]['x'], targets[0]['y'])
+        get_position(sct, targets[0]['x'], targets[0]['y'], targets[0]['thresh'])
         time.sleep(1)
 
         level_time = 0
@@ -152,29 +159,45 @@ if __name__ == '__main__':
                 generation_counter += 1
 
                 for agent in tqdm(pop.get_agents()):
+                    agent: Agent = agent
                     x_pos = 0
                     y_pos = 0
                     reset_level(keyboard)
                     start = time.time()
                     dead = False
                     score = 0
+                    target_counter = 0
+
+                    action_counter = 0
                     for a in agent.get_actions():
+                        if a == -1:
+                            print('targets be like', target['pause'])
+                            start_pause = time.time()
+                            while time.time() - start_pause < target['pause'] and not dead:
+                                x_pos, y_pos, dead = get_position(sct, targets[target_counter]['x'], targets[target_counter]['y'], targets[target_counter]['thresh'])
+                                for b in buttons:
+                                    keyboard.release(b)
+                            target_counter +=1
+                            action_counter = 0
+                            continue
+                        action_counter += 1
+
                         action = actions[a]
                         for key in action:
                             if key is not None:
                                 keyboard.press(key)
                         last_press = time.time()
                         while time.time() - last_press < 0.25:
-                            x_pos, y_pos, dead = get_position(sct, target['x'], target['y'])
+                            x_pos, y_pos, dead = get_position(sct, targets[target_counter]['x'], targets[target_counter]['y'], targets[target_counter]['thresh'])
                             if dead:
                                 break
+                        agent.cut_to(action_counter)
 
                         if dead:
                             break
 
-                        for key in reversed(action):
-                            if key is not None:
-                                keyboard.release(key)
+                        for b in buttons:
+                            keyboard.release(b)
                         time.sleep(0.01)
 
                         if time.time() - start > level_time:
@@ -182,49 +205,53 @@ if __name__ == '__main__':
 
                     start_pause = time.time()
                     while time.time() - start_pause < target['pause'] and not dead:
-                        x_pos, y_pos, dead = get_position(sct, target['x'], target['y'])
-                    if dead:
-                        score -= abs(target['thresh'])
+                        x_pos, y_pos, dead = get_position(sct, targets[target_counter]['x'], targets[target_counter]['y'], targets[target_counter]['thresh'])
 
                     score += -math.dist((x_pos, y_pos), (target['x'], target['y']))
                     agent.set_fitness(score)
                     if score > best_score:
                         print(f"Improved from {best_score} to {score}")
                         best_score = score
-
                 print("Best Score:", best_score)
-                pop.evolve()
+
+                print(pop.get_agents()[0].get_actions())
+                print(len(pop.get_agents()[0].get_actions()))
+
+
                 if best_score > target['thresh']:
                     print("REACHED CHECKPOINT")
                     best_score = -999999
                     pop.propogate()
                     break
+                else:
+                    pop.evolve()
+            level_time += target['pause']
 
         cv2.destroyAllWindows()
-
-        # Replay success
-        print('replaying winner')
-        while True:
-            agent = pop.get_agents()[0]
-            x_pos = 0
-            y_pos = 0
-            reset_level(keyboard)
-            start = time.time()
-            for a in agent.get_actions():
-                action = actions[a]
-                for key in action:
-                    if key is not None:
-                        keyboard.press(key)
-                last_press = time.time()
-                while time.time() - last_press < 0.125:
-                    pass
-
-                for key in reversed(action):
-                    if key is not None:
-                        keyboard.release(key)
-                time.sleep(0.01)
-                if time.time() - start > level_time:
-                    break
-
-            score = -math.dist((x_pos, y_pos), (target['x'], target['y']))
-            agent.set_fitness(score)
+        print('done')
+        # # Replay success
+        # print('replaying winner')
+        # while True:
+        #     agent = pop.get_agents()[0]
+        #     x_pos = 0
+        #     y_pos = 0
+        #     reset_level(keyboard)
+        #     start = time.time()
+        #     for a in agent.get_actions():
+        #         action = actions[a]
+        #         for key in action:
+        #             if key is not None:
+        #                 keyboard.press(key)
+        #         last_press = time.time()
+        #         while time.time() - last_press < 0.125:
+        #             pass
+        #
+        #         for key in reversed(action):
+        #             if key is not None:
+        #                 keyboard.release(key)
+        #         time.sleep(0.01)
+        #         if time.time() - start > level_time:
+        #             break
+        #
+        #     score = -math.dist((x_pos, y_pos), (target['x'], target['y']))
+        #     agent.set_fitness(score)
