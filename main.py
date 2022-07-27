@@ -14,6 +14,7 @@ from tqdm import tqdm
 POPULATION_SIZE = 20
 START_LEVEL = 0
 
+dead_dist = 200
 def calibrate_screen(sct):
     while True:
         screenShot = sct.grab(mon)
@@ -55,9 +56,23 @@ def get_position(sct, target_x, target_y):
 
     x, y = x_pos, y_pos
     w, h = 0, 0
+    highest_y = 0
+
+    points = []
     for c in cnts:
-        x, y, w, h = cv2.boundingRect(c)
-    cv2.rectangle(img, (x, y), (x + w, y + h), (0, 0, 255), 2)
+        tx, ty, tw, th = cv2.boundingRect(c)
+        points.append([tx, ty])
+        if ty > highest_y:
+            x, y, w, h = tx, ty, tw, th
+
+    dead = False
+    for e, a in enumerate(points):
+        for b in points[e+1:]:
+            dist = math.dist(a, b)
+            if dist > dead_dist:
+                dead = True
+                print(time.time(), 'HEAVY IS DED')
+    cv2.rectangle(img, (x, y), (x + w, y + h), (255, 100, 255), 6)
 
     cv2.circle(img, (target_x, target_y), 2, (100, 255, 100), 5)
 
@@ -67,7 +82,7 @@ def get_position(sct, target_x, target_y):
         cv2.destroyAllWindows()
         quit()
 
-    return x, y, h, w
+    return x, y, h, w, dead
 
 
 def generate_actions():
@@ -93,11 +108,11 @@ def next_level(keyboard: Controller):
 
 def reset_level(keyboard: Controller):
     keyboard.press('f')
-    time.sleep(0.2)
+    time.sleep(0.3)
     keyboard.release('f')
-    time.sleep(0.2)
+    time.sleep(0.3)
     keyboard.press('s')
-    time.sleep(0.2)
+    time.sleep(0.3)
     keyboard.release('s')
     time.sleep(0.75)
 
@@ -119,16 +134,16 @@ if __name__ == '__main__':
     keyboard = Controller()
 
     with mss() as sct:
-
         targets = levels['levels'][level_counter]['targets']
+        calibrate_screen(sct)
+        get_position(sct, targets[0]['x'], targets[0]['y'])
+        time.sleep(1)
+
         level_time = 0
         for target in targets:
             level_time += target['time']
             print('Target:', (target['x'], target['y']))
             pop.add_target(num_choices=len(actions), num_actions=int(11 * target['time'] + 0.5))
-
-            calibrate_screen(sct)
-            time.sleep(1)
             while True:
                 print('------')
                 print('Generation:', generation_counter)
@@ -139,24 +154,32 @@ if __name__ == '__main__':
                     y_pos = 0
                     reset_level(keyboard)
                     start = time.time()
+                    dead = False
+                    score = 0
                     for a in agent.get_actions():
                         action = actions[a]
-                        x_pos, y_pos, _, _ = get_position(sct, target['x'], target['y'])
+                        for key in action:
+                            if key is not None:
+                                keyboard.press(key)
+                        last_press = time.time()
+                        while time.time() - last_press < 0.25:
+                            x_pos, y_pos, _, _, dead = get_position(sct, target['x'], target['y'])
+                            if dead:
+                                break
 
-                        if time.time() - last_press > 0.01:
-                            for key in action:
-                                if key is not None:
-                                    keyboard.press(key)
-                            time.sleep(0.25)
-                            for key in action:
-                                if key is not None:
-                                    keyboard.release(key)
-                            last_press = time.time()
+                        if dead:
+                            score -= 100
+                            break
+
+                        for key in reversed(action):
+                            if key is not None:
+                                keyboard.release(key)
+                        time.sleep(0.01)
 
                         if time.time() - start > level_time:
                             break
 
-                    score = -math.dist((x_pos, y_pos), (target['x'], target['y']))
+                    score += -math.dist((x_pos, y_pos), (target['x'], target['y']))
                     agent.set_fitness(score)
                     if score > best_score:
                         print(f"Improved from {best_score} to {score}")
@@ -166,5 +189,36 @@ if __name__ == '__main__':
                 pop.evolve()
                 if abs(best_score) < target['thresh']:
                     print("REACHED CHECKPOINT")
-
+                    best_score = -999999
+                    pop.propogate()
                     break
+
+        cv2.destroyAllWindows()
+
+        # Replay success
+        print('replaying winner')
+        while True:
+            agent = pop.get_agents()[0]
+            x_pos = 0
+            y_pos = 0
+            reset_level(keyboard)
+            start = time.time()
+            for a in agent.get_actions():
+                action = actions[a]
+                for key in action:
+                    if key is not None:
+                        keyboard.press(key)
+                last_press = time.time()
+                while time.time() - last_press < 0.125:
+                    pass
+
+                for key in reversed(action):
+                    if key is not None:
+                        keyboard.release(key)
+                time.sleep(0.01)
+                if time.time() - start > level_time:
+                    break
+
+            score = -math.dist((x_pos, y_pos), (target['x'], target['y']))
+            agent.set_fitness(score)
+

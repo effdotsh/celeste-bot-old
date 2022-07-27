@@ -61,3 +61,8 @@ class Population:
             self.dump_results()
 
         self.generation_counter += 1
+
+    def propogate(self):
+        for agent in self.agents[1:]:
+            for e, target in enumerate(agent.targets):
+                target.actions = copy.deepcopy(self.agents[0].targets[e].actions)
