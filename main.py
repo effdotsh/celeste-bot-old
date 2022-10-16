@@ -60,13 +60,12 @@ def get_position(sct, target_x, target_y, target_radius, show_screen: bool = Fal
 
     x, y = x_pos, y_pos
     w, h = 0, 0
-    highest_y = 0
 
     points = []
     for c in cnts:
         tx, ty, tw, th = cv2.boundingRect(c)
         points.append([tx, ty])
-        if ty > highest_y:
+        if ty > y:
             x, y, w, h = tx, ty, tw, th
 
     dead = False
