@@ -49,7 +49,6 @@ def get_position(sct, target_x, target_y, target_radius, show_screen: bool = Fal
 
     hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
 
-    # Threshold of blue in HSV space
     lower_skin = np.array([2, 75, 255])
     upper_skin = np.array([22, 95, 255])
 
